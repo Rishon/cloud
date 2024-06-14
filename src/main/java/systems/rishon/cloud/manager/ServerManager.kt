@@ -50,6 +50,7 @@ class ServerManager(private val handler: MainHandler) {
             val uniqueId = UUID.randomUUID().toString().slice(0..4)
             val name = "$serverName-$uniqueId"
             LoggerUtil.log("Starting server $name with image $imageName...")
+
             val containerId = this.dockerClient.createContainer(imageName, name)
             this.containerMap[name] = containerId
             this.dockerClient.startContainer(containerId)
@@ -109,30 +110,29 @@ class ServerManager(private val handler: MainHandler) {
     }
 
     fun monitorAndScale() {
-        CompletableFuture.runAsync({
-            val proxy = this.handler.getPlugin().proxy
-            val playerCount = proxy.playerCount
-            val serverCount = this.containerMap.size
-            val scaleDownBuffer = 0.8
+        val proxy = this.handler.getPlugin().proxy
+        val playerCount = proxy.playerCount
+        val serverCount = this.containerMap.size
 
-            this.serverData.forEach { data ->
-                if (serverCount < data.maxConcurrentServers) {
-                    if (playerCount > serverCount * data.maxPlayers) {
-                        startServer(data.dockerImage, data.serverName)
-                    } else if (playerCount < serverCount * data.maxPlayers * scaleDownBuffer && serverCount > data.minConcurrentServers) {
-                        val serversToStop = this.containerMap.filter { (name, _) ->
-                            proxy.getServer(name).map { server ->
-                                server.playersConnected.size <= data.maxPlayers / 2 && data.downScaleIfEmpty
-                            }.orElse(false)
-                        }
+        this.serverData.forEach { data ->
+            if (serverCount < data.maxConcurrentServers) {
+                if (playerCount > serverCount * data.maxPlayers) {
+                    startServer(data.dockerImage, data.serverName)
+                }
+            } else if (serverCount > data.minConcurrentServers) {
 
-                        serversToStop.forEach { (name, _) ->
-                            stopServer(name, true)
-                        }
-                    }
+                val serversToStop = this.containerMap.filter { (name, _) ->
+                    proxy.getServer(name).map { server ->
+                        server.playersConnected.size < data.maxPlayers / 2
+                    }.orElse(false)
+                }
+
+                serversToStop.forEach { (name, _) ->
+                    stopServer(name, true)
+                    LoggerUtil.log("Server with name $name stopped.")
                 }
             }
-        }, executor)
+        }
     }
 
     fun autoHeal() {
