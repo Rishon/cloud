@@ -24,6 +24,7 @@ class FileHandler(private val plugin: Cloud) : IHandler {
 
     // Scaling
     var serverData: MutableList<ServerData> = mutableListOf()
+    var downScaleIfEmpty: Boolean = true
 
     init {
         handler = this
@@ -76,6 +77,7 @@ class FileHandler(private val plugin: Cloud) : IHandler {
             server.minConcurrentServers = serverTable.getLong("min-concurrent-servers")?.toInt() ?: 1
             server.maxConcurrentServers = serverTable.getLong("max-concurrent-servers")?.toInt() ?: 1
             server.maxPlayers = serverTable.getLong("max-players")?.toInt() ?: 10
+            server.downScaleIfEmpty = serverTable.getBoolean("downscale-if-empty") ?: true
             this.serverData.add(server)
             LoggerUtil.log("Loaded server ${server.serverName} with image ${server.dockerImage}:${server.dockerTag}")
         }

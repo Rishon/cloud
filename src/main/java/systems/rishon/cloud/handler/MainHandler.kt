@@ -34,7 +34,7 @@ class MainHandler(private val plugin: Cloud) : IHandler {
         // Stop all servers
         LoggerUtil.log("Stopping all servers...")
         for (name in this.serverManager.getContainerMap().keys) {
-            this.serverManager.stopServer(name)
+            this.serverManager.stopServer(name, false)
             LoggerUtil.log("Server with name $name stopped.")
         }
 
@@ -44,7 +44,7 @@ class MainHandler(private val plugin: Cloud) : IHandler {
     private fun loadTasks() {
         this.serverManagerTask = ServerManagerTask(this)
         this.plugin.proxy.scheduler.buildTask(this.plugin, this.serverManagerTask)
-            .repeat(FileHandler.handler.serverCheckInterval, TimeUnit.SECONDS).schedule()
+            .repeat(FileHandler.handler.serverCheckInterval, TimeUnit.SECONDS).delay(3, TimeUnit.SECONDS).schedule()
     }
 
     fun getServerManager(): ServerManager {

@@ -16,6 +16,7 @@ docker-tag = "latest"
 min-concurrent-servers = 1
 max-concurrent-servers = 5
 max-players = 10 # The max players that can be in the server
+downscale-if-empty = true # Downscale the server if it's empty
 
 [[server]]
 prefix-name = "uhc"
@@ -24,3 +25,4 @@ tag = "latest"
 min-concurrent-servers = 1
 max-concurrent-servers = 3
 max-players = 100 # The max players that can be in the server
+downscale-if-empty = false # Downscale the server if it's empty

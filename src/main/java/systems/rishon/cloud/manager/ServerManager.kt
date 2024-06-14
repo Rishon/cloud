@@ -1,15 +1,19 @@
 package systems.rishon.cloud.manager
 
-import com.velocitypowered.api.proxy.server.RegisteredServer
 import com.velocitypowered.api.proxy.server.ServerInfo
 import systems.rishon.cloud.docker.DockerClientManager
 import systems.rishon.cloud.handler.FileHandler
 import systems.rishon.cloud.handler.MainHandler
 import systems.rishon.cloud.utils.LoggerUtil
-import java.util.Optional
 import java.util.UUID
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 class ServerManager(private val handler: MainHandler) {
+
+    // Executor
+    private val executor: ExecutorService = Executors.newFixedThreadPool(10)
 
     // DockerClient
     private var dockerClient: DockerClientManager = DockerClientManager()
@@ -42,101 +46,118 @@ class ServerManager(private val handler: MainHandler) {
     }
 
     fun startServer(imageName: String, serverName: String) {
-        val uniqueId = UUID.randomUUID().toString().slice(0..4)
-        val name = "$serverName-$uniqueId"
-        LoggerUtil.log("Starting server $name with image $imageName...")
-        val containerId = this.dockerClient.createContainer(imageName, name)
-        this.containerMap[name] = containerId
-        this.dockerClient.startContainer(containerId)
+        CompletableFuture.runAsync({
+            val uniqueId = UUID.randomUUID().toString().slice(0..4)
+            val name = "$serverName-$uniqueId"
+            LoggerUtil.log("Starting server $name with image $imageName...")
+            val containerId = this.dockerClient.createContainer(imageName, name)
+            this.containerMap[name] = containerId
+            this.dockerClient.startContainer(containerId)
 
-        val proxy = this.handler.getPlugin().proxy
-        val serverInfo: ServerInfo = ServerInfo(
-            name, this.dockerClient.getContainerAddress(this.dockerClient.getContainer(containerId).get())
-        )
+            val proxy = this.handler.getPlugin().proxy
+            val serverInfo: ServerInfo = ServerInfo(
+                name, this.dockerClient.getContainerAddress(this.dockerClient.getContainer(containerId).get())
+            )
 
-        if (FileHandler.handler.autoAddServers) proxy.registerServer(serverInfo)
-        else proxy.createRawRegisteredServer(serverInfo)
+            if (FileHandler.handler.autoAddServers) proxy.registerServer(serverInfo)
+            else proxy.createRawRegisteredServer(serverInfo)
 
-        LoggerUtil.log("Server with name $name started.")
+            LoggerUtil.log("Server with name $name started.")
+        }, executor)
     }
 
-    fun stopServer(serverName: String) {
-        val containerId = containerMap[serverName]
+    fun stopServer(serverName: String, async: Boolean) {
+        val stopServerTask = {
+            val containerId = containerMap[serverName]
 
-        if (containerId == null) {
-            LoggerUtil.error("Container with name $serverName not found.")
-            return
+            if (containerId != null) {
+                containerMap.remove(serverName)
+                dockerClient.stopContainer(containerId)
+                dockerClient.removeContainer(containerId)
+
+                val proxy = handler.getPlugin().proxy
+                val registeredServer = proxy.getServer(serverName)
+                if (registeredServer != null && registeredServer.isPresent) {
+                    val serverInfo: ServerInfo = registeredServer.get().serverInfo
+                    proxy.unregisterServer(serverInfo)
+                }
+            } else {
+                LoggerUtil.error("Container with name $serverName not found.")
+            }
         }
 
-        this.dockerClient.stopContainer(containerId)
-        this.dockerClient.removeContainer(containerId)
-        this.containerMap.remove(serverName)
-
-        val proxy = this.handler.getPlugin().proxy
-        val registeredServer: Optional<RegisteredServer?>? = proxy.getServer(serverName)
-        if (registeredServer == null) return
-        val serverInfo: ServerInfo = registeredServer.get().serverInfo
-        proxy.unregisterServer(serverInfo)
+        if (async) {
+            CompletableFuture.runAsync(stopServerTask, executor)
+        } else {
+            stopServerTask()
+        }
     }
 
     fun deleteDanglingContainers() {
-        val containers = this.dockerClient.listContainers()
-        LoggerUtil.log("Checking for dangling containers...")
-        for (container in containers) {
-            if (this.images.contains(container.image) && !this.containerMap.containsValue(container.id)) {
-                LoggerUtil.error("Dangling container with id ${container.id} and image ${container.image} will be removed.")
-                this.dockerClient.stopContainer(container.id)
-                this.dockerClient.removeContainer(container.id)
+        CompletableFuture.runAsync({
+            val containers = this.dockerClient.listContainers()
+            LoggerUtil.log("Checking for dangling containers...")
+            for (container in containers) {
+                if (this.images.contains(container.image) && !this.containerMap.containsValue(container.id)) {
+                    LoggerUtil.error("Dangling container with id ${container.id} and image ${container.image} will be removed.")
+                    this.dockerClient.stopContainer(container.id)
+                    this.dockerClient.removeContainer(container.id)
+                }
             }
-        }
+            LoggerUtil.log("Dangling containers removed.")
+        }, executor)
     }
 
     fun monitorAndScale() {
-        val proxy = this.handler.getPlugin().proxy
-        val playerCount = proxy.playerCount
-        val serverCount = this.containerMap.size
+        CompletableFuture.runAsync({
+            val proxy = this.handler.getPlugin().proxy
+            val playerCount = proxy.playerCount
+            val serverCount = this.containerMap.size
+            val scaleDownBuffer = 0.8
 
-        this.serverData.forEach { data ->
-            if (serverCount < data.maxConcurrentServers) {
-                if (playerCount >= serverCount * data.maxPlayers) {
-                    LoggerUtil.log("Scaling up servers...")
-                    startServer(data.dockerImage, data.serverName)
-                } else if (playerCount < serverCount * data.maxPlayers && serverCount > data.minConcurrentServers) {
-                    val serversToStop = this.containerMap.filter { (name, _) ->
-                        proxy.getServer(name).map { it.playersConnected.size <= data.maxPlayers / 2 }.orElse(false)
-                    }
+            this.serverData.forEach { data ->
+                if (serverCount < data.maxConcurrentServers) {
+                    if (playerCount > serverCount * data.maxPlayers) {
+                        startServer(data.dockerImage, data.serverName)
+                    } else if (playerCount < serverCount * data.maxPlayers * scaleDownBuffer && serverCount > data.minConcurrentServers) {
+                        val serversToStop = this.containerMap.filter { (name, _) ->
+                            proxy.getServer(name).map { server ->
+                                server.playersConnected.size <= data.maxPlayers / 2 && data.downScaleIfEmpty
+                            }.orElse(false)
+                        }
 
-                    serversToStop.forEach { (name, _) ->
-                        stopServer(name)
-                        LoggerUtil.log("Scaling down servers...")
+                        serversToStop.forEach { (name, _) ->
+                            stopServer(name, true)
+                        }
                     }
                 }
             }
-        }
+        }, executor)
     }
 
     fun autoHeal() {
-        // Auto heal servers
-        for ((name, containerId) in this.containerMap) {
+        CompletableFuture.runAsync({
+            // Auto heal servers
+            for ((name, containerId) in this.containerMap) {
+                if (!this.dockerClient.doesContainerExist(containerId)) {
+                    LoggerUtil.error("Server with name $name does not exist and will be removed.")
+                    this.containerMap.values.remove(containerId)
+                    monitorAndScale()
+                    continue
+                }
 
-            if (!this.dockerClient.doesContainerExist(containerId)) {
-                LoggerUtil.error("Server with name $name does not exist and will be removed.")
-                this.containerMap.values.remove(containerId)
-                monitorAndScale()
-                continue
+                val state = this.dockerClient.getContainerState(containerId)
+                if (state == "exited") {
+                    LoggerUtil.error("Server with name $name is in state $state and will be removed.")
+                    this.dockerClient.removeContainer(containerId)
+                } else if (state != "running") {
+                    LoggerUtil.error("Server with name $name is in state $state and will be restarted.")
+                    stopServer(name, true)
+                    startServer(this.serverData.first { it.serverName == name }.dockerImage, name)
+                    return@runAsync
+                }
             }
-
-            val state = this.dockerClient.getContainerState(containerId)
-            if (state == "exited") {
-                LoggerUtil.error("Server with name $name is in state $state and will be removed.")
-                this.dockerClient.removeContainer(containerId)
-            } else if (state != "running") {
-                LoggerUtil.error("Server with name $name is in state $state and will be restarted.")
-                stopServer(name)
-                startServer(this.serverData.first { it.serverName == name }.dockerImage, name)
-                return
-            }
-        }
+        }, executor)
     }
 
     fun getContainerMap(): MutableMap<String, String> {
