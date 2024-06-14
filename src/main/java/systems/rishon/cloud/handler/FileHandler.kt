@@ -17,6 +17,7 @@ class FileHandler(private val plugin: Cloud) : IHandler {
     var dockerHost: String? = null
     var dockerLocalIP: String? = null
     var serverCheckInterval: Long = 60
+    var pruneContainers: Boolean = true
 
     // Velocity
     var autoAddServers: Boolean = true
@@ -34,9 +35,7 @@ class FileHandler(private val plugin: Cloud) : IHandler {
         LoggerUtil.log("FileHandler initialized!")
     }
 
-    override fun end() {
-        LoggerUtil.log("Shutting down FileHandler...")
-    }
+    override fun end() {}
 
     private fun loadConfigurations() {
         val dir = this.plugin.directory.toFile()
@@ -64,6 +63,7 @@ class FileHandler(private val plugin: Cloud) : IHandler {
         this.dockerHost = this.config.getString("docker.host") ?: "tcp://127.0.0.1:2375"
         this.dockerLocalIP = this.config.getString("docker.local-ip") ?: "127.0.0.1"
         this.serverCheckInterval = this.config.getLong("docker.server_check_interval")
+        this.pruneContainers = this.config.getBoolean("docker.prune-containers") ?: false
 
         // Load servers data
         val serverDataList = this.config.getTables("server") ?: emptyList()

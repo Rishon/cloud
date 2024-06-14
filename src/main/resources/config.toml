@@ -3,6 +3,7 @@
 host = "tcp://127.0.0.1:2375"
 local-ip = "127.0.0.1"
 server_check_interval = 60 # In seconds
+prune-containers = false # Prune containers on startup
 
 [velocity]
 auto-add-servers = true # Add servers to velocity /server command

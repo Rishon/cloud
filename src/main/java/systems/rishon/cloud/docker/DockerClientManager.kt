@@ -3,6 +3,7 @@ package systems.rishon.cloud.docker
 import com.github.dockerjava.api.DockerClient
 import com.github.dockerjava.api.model.Container
 import com.github.dockerjava.api.model.HostConfig
+import com.github.dockerjava.api.model.PruneType
 import com.github.dockerjava.core.DefaultDockerClientConfig
 import com.github.dockerjava.core.DockerClientImpl
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient
@@ -16,9 +17,9 @@ class DockerClientManager() {
 
     init {
         // Docker Client Config
-        val config = DefaultDockerClientConfig.createDefaultConfigBuilder()
-            .withDockerHost(FileHandler.handler.dockerHost)
-            .withDockerTlsVerify(false).build()
+        val config =
+            DefaultDockerClientConfig.createDefaultConfigBuilder().withDockerHost(FileHandler.handler.dockerHost)
+                .withDockerTlsVerify(false).build()
 
         // HTTP Client
         val httpClient =
@@ -29,10 +30,12 @@ class DockerClientManager() {
     }
 
     fun createContainer(image: String, name: String): String {
-        val response =
-            this.client.createContainerCmd(image).withName(name).withHostConfig(HostConfig()).withPublishAllPorts(true)
-                .exec()
-        return response.id
+        val hostConfig = HostConfig()
+        hostConfig.withPublishAllPorts(true)
+        hostConfig.withNetworkMode("bridge")
+
+        val containerResponse = this.client.createContainerCmd(image).withName(name).withHostConfig(hostConfig).exec()
+        return containerResponse.id
     }
 
     fun startContainer(containerId: String) {
@@ -63,6 +66,14 @@ class DockerClientManager() {
 
     fun doesContainerExist(containerId: String): Boolean {
         return this.client.listContainersCmd().withShowAll(true).exec().any { it.id == containerId }
+    }
+
+    fun pruneContainers() {
+        this.client.pruneCmd(PruneType.CONTAINERS).exec()
+    }
+
+    fun listContainers(): List<Container> {
+        return this.client.listContainersCmd().withShowAll(true).exec()
     }
 
     fun getContainerState(containerId: String): String {
