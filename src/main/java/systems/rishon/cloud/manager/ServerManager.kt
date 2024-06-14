@@ -1,9 +1,12 @@
 package systems.rishon.cloud.manager
 
+import com.velocitypowered.api.proxy.server.RegisteredServer
+import com.velocitypowered.api.proxy.server.ServerInfo
 import systems.rishon.cloud.docker.DockerClientManager
 import systems.rishon.cloud.handler.FileHandler
 import systems.rishon.cloud.handler.MainHandler
 import systems.rishon.cloud.utils.LoggerUtil
+import java.util.Optional
 import java.util.UUID
 
 class ServerManager(private val handler: MainHandler) {
@@ -20,7 +23,6 @@ class ServerManager(private val handler: MainHandler) {
     init {
         // Start with minimum servers
         this.serverData.forEach { data ->
-            println(data)
             for (i in 0 until data.minConcurrentServers) startServer(data.dockerImage, data.serverName)
         }
     }
@@ -32,6 +34,15 @@ class ServerManager(private val handler: MainHandler) {
         val containerId = this.dockerClient.createContainer(imageName, name)
         this.containerMap[name] = containerId
         this.dockerClient.startContainer(containerId)
+
+        val proxy = this.handler.getPlugin().proxy
+        val serverInfo: ServerInfo = ServerInfo(
+            name, this.dockerClient.getContainerAddress(this.dockerClient.getContainer(containerId).get())
+        )
+
+        if (FileHandler.handler.autoAddServers) proxy.registerServer(serverInfo)
+        else proxy.createRawRegisteredServer(serverInfo)
+
         LoggerUtil.log("Server with name $name started.")
     }
 
@@ -46,6 +57,12 @@ class ServerManager(private val handler: MainHandler) {
         this.dockerClient.stopContainer(containerId)
         this.dockerClient.removeContainer(containerId)
         this.containerMap.remove(serverName)
+
+        val proxy = this.handler.getPlugin().proxy
+        val registeredServer: Optional<RegisteredServer?>? = proxy.getServer(serverName)
+        if (registeredServer == null) return
+        val serverInfo: ServerInfo = registeredServer.get().serverInfo
+        proxy.unregisterServer(serverInfo)
     }
 
     fun monitorAndScale() {

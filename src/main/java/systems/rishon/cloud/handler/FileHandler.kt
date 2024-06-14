@@ -18,6 +18,9 @@ class FileHandler(private val plugin: Cloud) : IHandler {
     var dockerLocalIP: String? = null
     var serverCheckInterval: Long = 60
 
+    // Velocity
+    var autoAddServers: Boolean = true
+
     // Scaling
     var serverData: MutableList<ServerData> = mutableListOf()
 
@@ -51,7 +54,10 @@ class FileHandler(private val plugin: Cloud) : IHandler {
         }
 
         this.config = Toml().read(configFile)
+
+        // Load settings
         loadDockerSettings()
+        loadVelocitySettings()
     }
 
     private fun loadDockerSettings() {
@@ -73,6 +79,10 @@ class FileHandler(private val plugin: Cloud) : IHandler {
             this.serverData.add(server)
             LoggerUtil.log("Loaded server ${server.serverName} with image ${server.dockerImage}:${server.dockerTag}")
         }
+    }
+
+    private fun loadVelocitySettings() {
+        this.autoAddServers = this.config.getBoolean("velocity.auto-add-servers") ?: true
     }
 
     companion object {

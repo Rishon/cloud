@@ -50,7 +50,7 @@ class DockerClientManager() {
             .findFirst()
     }
 
-    fun getContainerPort(container: Container): InetSocketAddress {
+    fun getContainerAddress(container: Container): InetSocketAddress {
         val port: Int = container.ports?.first()?.publicPort
             ?: throw IllegalArgumentException("Container does not have any ports exposed.")
         return InetSocketAddress(FileHandler.handler.dockerLocalIP, port)
