@@ -1,0 +1,22 @@
+# Docker settings
+[docker]
+host = "tcp://127.0.0.1:2375"
+local-ip = "127.0.0.1"
+server_check_interval = 60 # In seconds
+
+# Scaling server settings
+[[server]]
+prefix-name = "lobby"
+docker-image = "lobby-image"
+docker-tag = "latest"
+min-concurrent-servers = 1
+max-concurrent-servers = 5
+max-players = 10 # The max players that can be in the server
+
+[[server]]
+prefix-name = "uhc"
+image = "uhc-image"
+tag = "latest"
+min-concurrent-servers = 1
+max-concurrent-servers = 3
+max-players = 100 # The max players that can be in the server

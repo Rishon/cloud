@@ -1,0 +1,9 @@
+{
+  "id": "cloud",
+  "name": "Cloud",
+  "version": "1.0",
+  "main": "systems.rishon.cloud.Cloud",
+  "authors": [
+    "Rishon"
+  ]
+}
