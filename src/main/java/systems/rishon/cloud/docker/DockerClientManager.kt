@@ -1,13 +1,17 @@
 package systems.rishon.cloud.docker
 
 import com.github.dockerjava.api.DockerClient
+import com.github.dockerjava.api.command.CreateContainerResponse
 import com.github.dockerjava.api.model.Container
+import com.github.dockerjava.api.model.ExposedPort
 import com.github.dockerjava.api.model.HostConfig
+import com.github.dockerjava.api.model.Ports
 import com.github.dockerjava.api.model.PruneType
 import com.github.dockerjava.core.DefaultDockerClientConfig
 import com.github.dockerjava.core.DockerClientImpl
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient
 import systems.rishon.cloud.handler.FileHandler
+import systems.rishon.cloud.utils.LoggerUtil
 import java.net.InetSocketAddress
 import java.util.Optional
 
@@ -30,12 +34,43 @@ class DockerClientManager() {
     }
 
     fun createContainer(image: String, name: String): String {
-        val hostConfig = HostConfig()
-        hostConfig.withPublishAllPorts(true)
-        hostConfig.withNetworkMode("bridge")
+        val fileHandler = FileHandler.handler
 
-        val containerResponse = this.client.createContainerCmd(image).withName(name).withHostConfig(hostConfig).exec()
-        return containerResponse.id
+        val portRange = fileHandler.portRange.split(":").map { it.toInt() }
+        val availablePorts = (portRange[0]..portRange[1]).toMutableList()
+
+        // Check for available ports and create containers
+        while (availablePorts.isNotEmpty()) {
+            val port = availablePorts.removeAt(0)
+            if (doesPortExist(port)) continue
+
+            val exposedPort = ExposedPort.tcp(port)
+            val portBindings = Ports().apply {
+                bind(exposedPort, Ports.Binding.bindPort(port))
+            }
+
+            val hostConfig = HostConfig()
+                .withPortBindings(portBindings)
+                .withNetworkMode("bridge")
+                .withAutoRemove(true)
+
+            val containerResponse: CreateContainerResponse = this.client.createContainerCmd(image)
+                .withName("${name}_$port")
+                .withHostConfig(hostConfig)
+                .withExposedPorts(exposedPort)
+                .withHostName(fileHandler.dockerLocalIP)
+                .exec()
+
+            LoggerUtil.log("Created container with ID: ${containerResponse.id} for port $port")
+            return containerResponse.id
+        }
+
+        throw IllegalArgumentException("No available ports in range ${fileHandler.portRange}")
+    }
+
+    private fun doesPortExist(port: Int): Boolean {
+        return this.client.listContainersCmd().withShowAll(true).exec()
+            .any { it.ports?.any { portBinding -> portBinding.publicPort == port } == true }
     }
 
     fun startContainer(containerId: String) {
@@ -59,9 +94,9 @@ class DockerClientManager() {
         return InetSocketAddress(FileHandler.handler.dockerLocalIP, port)
     }
 
-    fun removeContainer(containerId: String) {
+    fun removeContainer(containerId: String, force: Boolean = false) {
         if (!doesContainerExist(containerId)) return
-        this.client.removeContainerCmd(containerId).exec()
+        this.client.removeContainerCmd(containerId).withForce(force).exec()
     }
 
     fun doesContainerExist(containerId: String): Boolean {

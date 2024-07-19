@@ -101,8 +101,7 @@ class ServerManager(private val handler: MainHandler) {
             for (container in containers) {
                 if (this.images.contains(container.image) && !this.containerMap.containsValue(container.id)) {
                     LoggerUtil.error("Dangling container with id ${container.id} and image ${container.image} will be removed.")
-                    this.dockerClient.stopContainer(container.id)
-                    this.dockerClient.removeContainer(container.id)
+                    this.dockerClient.removeContainer(container.id, true)
                 }
             }
             LoggerUtil.log("Dangling containers removed.")
@@ -141,7 +140,7 @@ class ServerManager(private val handler: MainHandler) {
             for ((name, containerId) in this.containerMap) {
                 if (!this.dockerClient.doesContainerExist(containerId)) {
                     LoggerUtil.error("Server with name $name does not exist and will be removed.")
-                    this.containerMap.values.remove(containerId)
+                    this.containerMap.remove(name)
                     monitorAndScale()
                     continue
                 }

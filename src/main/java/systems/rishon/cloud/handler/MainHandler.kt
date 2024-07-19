@@ -33,7 +33,9 @@ class MainHandler(private val plugin: Cloud) : IHandler {
 
         // Stop all servers
         LoggerUtil.log("Stopping all servers...")
-        for (name in this.serverManager.getContainerMap().keys) {
+        val keys = this.serverManager.getContainerMap().keys.toList()
+
+        for (name in keys) {
             this.serverManager.stopServer(name, false)
             LoggerUtil.log("Server with name $name stopped.")
         }

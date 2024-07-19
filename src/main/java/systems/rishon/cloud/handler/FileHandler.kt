@@ -18,13 +18,13 @@ class FileHandler(private val plugin: Cloud) : IHandler {
     var dockerLocalIP: String? = null
     var serverCheckInterval: Long = 60
     var pruneContainers: Boolean = true
+    lateinit var portRange: String
 
     // Velocity
     var autoAddServers: Boolean = true
 
     // Scaling
     var serverData: MutableList<ServerData> = mutableListOf()
-    var downScaleIfEmpty: Boolean = true
 
     init {
         handler = this
@@ -65,6 +65,7 @@ class FileHandler(private val plugin: Cloud) : IHandler {
         this.dockerLocalIP = this.config.getString("docker.local-ip") ?: "127.0.0.1"
         this.serverCheckInterval = this.config.getLong("docker.server_check_interval")
         this.pruneContainers = this.config.getBoolean("docker.prune-containers") ?: false
+        this.portRange = this.config.getString("docker.port-range") ?: ""
 
         // Load servers data
         val serverDataList = this.config.getTables("server") ?: emptyList()
