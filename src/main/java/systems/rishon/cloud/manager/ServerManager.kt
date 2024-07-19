@@ -1,14 +1,18 @@
 package systems.rishon.cloud.manager
 
+import com.github.dockerjava.api.command.InspectContainerResponse
+import com.github.dockerjava.api.model.Ports
 import com.velocitypowered.api.proxy.server.ServerInfo
 import systems.rishon.cloud.docker.DockerClientManager
 import systems.rishon.cloud.handler.FileHandler
 import systems.rishon.cloud.handler.MainHandler
 import systems.rishon.cloud.utils.LoggerUtil
+import java.net.InetSocketAddress
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class ServerManager(private val handler: MainHandler) {
 
@@ -51,19 +55,44 @@ class ServerManager(private val handler: MainHandler) {
             val name = "$serverName-$uniqueId"
             LoggerUtil.log("Starting server $name with image $imageName...")
 
-            val containerId = this.dockerClient.createContainer(imageName, name)
+            val container = this.dockerClient.createContainer(imageName, name)
+            val containerId = container.id
+            LoggerUtil.log("Container with name $name created with id ${containerId}.")
+
             this.containerMap[name] = containerId
-            this.dockerClient.startContainer(containerId)
 
-            val proxy = this.handler.getPlugin().proxy
-            val serverInfo: ServerInfo = ServerInfo(
-                name, this.dockerClient.getContainerAddress(this.dockerClient.getContainer(containerId).get())
-            )
+            try {
+                this.dockerClient.startContainer(containerId)
+                LoggerUtil.log("Container with name $name started.")
 
-            if (FileHandler.handler.autoAddServers) proxy.registerServer(serverInfo)
-            else proxy.createRawRegisteredServer(serverInfo)
+                val proxy = this.handler.getPlugin().proxy
 
-            LoggerUtil.log("Server with name $name started.")
+                this.handler.getPlugin().proxy.scheduler.buildTask(this.handler.getPlugin()) { task ->
+                    val containerInfo: InspectContainerResponse =
+                        this.dockerClient.getClient().inspectContainerCmd(containerId).exec()
+                    val portBindings: Ports? = containerInfo.networkSettings.ports
+                    val port = portBindings?.getBindings()?.keys?.first()?.port
+                    val socketAddress: InetSocketAddress =
+                        InetSocketAddress(FileHandler.handler.dockerLocalIP, Integer.parseInt(port.toString()))
+                    val serverInfo = ServerInfo(
+                        name, socketAddress
+                    )
+
+                    LoggerUtil.log("Registering server with name $name...")
+
+                    if (FileHandler.handler.autoAddServers) {
+                        proxy.registerServer(serverInfo)
+                    } else {
+                        proxy.createRawRegisteredServer(serverInfo)
+                    }
+
+                    LoggerUtil.log("Server with name $name started.")
+                }.delay(2, TimeUnit.SECONDS).schedule()
+
+            } catch (e: Exception) {
+                LoggerUtil.error("Failed to register server with name $name.")
+                e.printStackTrace()
+            }
         }, executor)
     }
 

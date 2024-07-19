@@ -12,7 +12,6 @@ import com.github.dockerjava.core.DockerClientImpl
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient
 import systems.rishon.cloud.handler.FileHandler
 import systems.rishon.cloud.utils.LoggerUtil
-import java.net.InetSocketAddress
 import java.util.Optional
 
 class DockerClientManager() {
@@ -33,7 +32,7 @@ class DockerClientManager() {
         this.client = DockerClientImpl.getInstance(config, httpClient)
     }
 
-    fun createContainer(image: String, name: String): String {
+    fun createContainer(image: String, name: String): Container {
         val fileHandler = FileHandler.handler
 
         val portRange = fileHandler.portRange.split(":").map { it.toInt() }
@@ -42,6 +41,7 @@ class DockerClientManager() {
         // Check for available ports and create containers
         while (availablePorts.isNotEmpty()) {
             val port = availablePorts.removeAt(0)
+            // If port exists, choose another port
             if (doesPortExist(port)) continue
 
             val exposedPort = ExposedPort.tcp(port)
@@ -61,8 +61,9 @@ class DockerClientManager() {
                 .withHostName(fileHandler.dockerLocalIP)
                 .exec()
 
-            LoggerUtil.log("Created container with ID: ${containerResponse.id} for port $port")
-            return containerResponse.id
+            LoggerUtil.log("Assigned port $port to container ${containerResponse.id}.")
+
+            return getContainer(containerResponse.id).orElseThrow()
         }
 
         throw IllegalArgumentException("No available ports in range ${fileHandler.portRange}")
@@ -88,11 +89,11 @@ class DockerClientManager() {
             .findFirst()
     }
 
-    fun getContainerAddress(container: Container): InetSocketAddress {
-        val port: Int = container.ports?.first()?.publicPort
-            ?: throw IllegalArgumentException("Container does not have any ports exposed.")
-        return InetSocketAddress(FileHandler.handler.dockerLocalIP, port)
-    }
+//    fun getContainerAddress(container: Container): InetSocketAddress {
+//        val port: Int = container.ports?.first()?.publicPort
+//            ?: throw IllegalArgumentException("Container does not have any ports exposed.")
+//        return InetSocketAddress(FileHandler.handler.dockerLocalIP, port)
+//    }
 
     fun removeContainer(containerId: String, force: Boolean = false) {
         if (!doesContainerExist(containerId)) return
@@ -113,5 +114,9 @@ class DockerClientManager() {
 
     fun getContainerState(containerId: String): String {
         return this.client.inspectContainerCmd(containerId).exec().state.status.toString()
+    }
+
+    fun getClient(): DockerClient {
+        return this.client
     }
 }
