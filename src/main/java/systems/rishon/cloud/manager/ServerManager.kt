@@ -170,6 +170,14 @@ class ServerManager(private val handler: MainHandler) {
                 if (!this.dockerClient.doesContainerExist(containerId)) {
                     LoggerUtil.error("Server with name $name does not exist and will be removed.")
                     this.containerMap.remove(name)
+
+                    // Unregister server
+                    val opt = this.handler.getPlugin().proxy.getServer(name)
+                    if (opt.isPresent) {
+                        val serverInfo: ServerInfo = opt.get().serverInfo
+                        this.handler.getPlugin().proxy.unregisterServer(serverInfo)
+                    }
+
                     monitorAndScale()
                     continue
                 }

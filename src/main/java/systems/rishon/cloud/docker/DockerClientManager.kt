@@ -89,12 +89,6 @@ class DockerClientManager() {
             .findFirst()
     }
 
-//    fun getContainerAddress(container: Container): InetSocketAddress {
-//        val port: Int = container.ports?.first()?.publicPort
-//            ?: throw IllegalArgumentException("Container does not have any ports exposed.")
-//        return InetSocketAddress(FileHandler.handler.dockerLocalIP, port)
-//    }
-
     fun removeContainer(containerId: String, force: Boolean = false) {
         if (!doesContainerExist(containerId)) return
         this.client.removeContainerCmd(containerId).withForce(force).exec()
