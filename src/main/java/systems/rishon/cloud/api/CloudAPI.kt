@@ -10,10 +10,10 @@ class CloudAPI {
     }
 
     /**
-     * Get all running servers names
+     * Get all names of running servers
      * @return List<String>
      */
-    fun getRunningServersNames(): List<String> {
+    fun getRunningServerNames(): List<String> {
         val serverManager = ServerManager.getManager()
         return serverManager.getContainerMap().keys.toList()
     }
@@ -26,6 +26,17 @@ class CloudAPI {
     fun restartServer(serverName: String) {
         val dockerClient = DockerClientManager.getManager()
         if (!dockerClient.restartContainer(serverName)) throw Exception("Failed to restart server $serverName")
+    }
+
+    /**
+     * Check if a server is related to the cloud system
+     * @param serverName String
+     * @return Boolean
+     */
+    fun isServerRelatedToCloud(serverName: String): Boolean {
+        val serverManager = ServerManager.getManager()
+        if (serverManager.getContainerMap().isEmpty()) return false
+        return serverManager.getContainerMap().containsKey(serverName)
     }
 
     companion object {

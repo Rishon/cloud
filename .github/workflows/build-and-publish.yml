@@ -24,6 +24,7 @@ jobs:
       - name: Gradle Build
         run: gradle clean :shadowJar
   publish:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
