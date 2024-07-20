@@ -19,7 +19,7 @@ jobs:
       - name: Java Setup
         uses: actions/setup-java@v4
         with:
-          java-version: 21
+          java-version: 17
           distribution: "corretto"
       - name: Gradle Build
         run: gradle clean :shadowJar
@@ -30,7 +30,7 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v1
         with:
-          java-version: 21
+          java-version: 17
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
       - name: Publish with Gradle

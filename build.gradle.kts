@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.jvm") version "2.0.0"
     id("io.freefair.lombok") version "8.4"
     id("com.github.johnrengelman.shadow") version "8.1.1"
+    id("maven-publish")
 }
 
 group = "systems.rishon"
@@ -57,5 +58,29 @@ tasks.withType<JavaCompile>().configureEach {
 
     if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible) {
         options.release.set(targetJavaVersion)
+    }
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "seladevelopment-repo"
+            url = uri("https://repo.rishon.systems/releases")
+            credentials {
+                username = System.getenv("MAVEN_NAME")
+                password = System.getenv("MAVEN_SECRET")
+            }
+            authentication {
+                create<BasicAuthentication>("basic")
+            }
+        }
+    }
+    publications {
+        create<MavenPublication>("maven") {
+            groupId = "systems.rishon"
+            artifactId = "cloud-api"
+            version = "${project.version}"
+            from(components["java"])
+        }
     }
 }
