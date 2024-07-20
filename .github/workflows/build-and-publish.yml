@@ -1,0 +1,40 @@
+name: Build Gradle and Publish to Maven
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Wrapper Validation
+        uses: gradle/actions/wrapper-validation@v3
+      - name: Java Setup
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: "corretto"
+      - name: Gradle Build
+        run: gradle clean :shadowJar
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: 21
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+      - name: Publish with Gradle
+        run: ./gradlew build publish
+        env:
+          MAVEN_NAME: ${{ secrets.MAVEN_NAME }}
+          MAVEN_SECRET: ${{ secrets.MAVEN_SECRET }}

@@ -32,6 +32,8 @@ class ServerManager(private val handler: MainHandler) {
     val serverData = FileHandler.handler.serverData
 
     init {
+        instance = this
+
         // Start with minimum servers
         this.serverData.forEach { data ->
             for (i in 0 until data.minConcurrentServers) {
@@ -137,6 +139,9 @@ class ServerManager(private val handler: MainHandler) {
         }, executor)
     }
 
+    /**
+     * Monitor and scale servers based on the load
+     */
     fun monitorAndScale() {
         val proxy = this.handler.getPlugin().proxy
         val playerCount = proxy.playerCount
@@ -163,6 +168,12 @@ class ServerManager(private val handler: MainHandler) {
         }
     }
 
+    /**
+     * Auto heal servers
+     * Remove servers that are not running or in exited state
+     * Restart servers that are not running
+     * Scale servers based on the load
+     */
     fun autoHeal() {
         CompletableFuture.runAsync({
             // Auto heal servers
@@ -198,5 +209,15 @@ class ServerManager(private val handler: MainHandler) {
 
     fun getContainerMap(): MutableMap<String, String> {
         return this.containerMap
+    }
+
+    // Access
+    companion object {
+        lateinit var instance: ServerManager
+
+        @JvmStatic
+        fun getManager(): ServerManager {
+            return instance
+        }
     }
 }

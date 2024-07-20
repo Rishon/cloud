@@ -19,6 +19,8 @@ class DockerClientManager() {
     private var client: DockerClient
 
     init {
+        instance = this
+
         // Docker Client Config
         val config =
             DefaultDockerClientConfig.createDefaultConfigBuilder().withDockerHost(FileHandler.handler.dockerHost)
@@ -84,6 +86,12 @@ class DockerClientManager() {
         this.client.stopContainerCmd(containerId).exec()
     }
 
+    fun restartContainer(containerId: String): Boolean {
+        if (!doesContainerExist(containerId)) return false
+        this.client.restartContainerCmd(containerId).exec()
+        return true
+    }
+
     fun getContainer(containerId: String): Optional<Container> {
         return this.client.listContainersCmd().withShowAll(true).exec().stream().filter { it.id == containerId }
             .findFirst()
@@ -112,5 +120,14 @@ class DockerClientManager() {
 
     fun getClient(): DockerClient {
         return this.client
+    }
+
+    companion object {
+        private lateinit var instance: DockerClientManager
+
+        @JvmStatic
+        fun getManager(): DockerClientManager {
+            return instance
+        }
     }
 }

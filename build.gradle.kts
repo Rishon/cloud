@@ -5,14 +5,17 @@ plugins {
     id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
-group = "dev.rishon"
-version = "1.0"
+group = "systems.rishon"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
     maven {
         name = "papermc-repo"
         url = uri("https://repo.papermc.io/repository/maven-public/")
+    }
+    maven {
+        url = uri("https://repo.rishon.systems/releases")
     }
 }
 
@@ -23,6 +26,9 @@ dependencies {
     // Docker
     implementation("com.github.docker-java:docker-java-core:3.3.6")
     implementation("com.github.docker-java:docker-java-transport-httpclient5:3.3.6")
+
+    // Utils-API
+    implementation("systems.rishon:utils-api:1.0.0")
 }
 
 tasks.shadowJar {
@@ -31,7 +37,7 @@ tasks.shadowJar {
     mergeServiceFiles()
 }
 
-val targetJavaVersion = 17
+val targetJavaVersion = 21
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
 
@@ -42,7 +48,7 @@ tasks.withType<JavaCompile>().configureEach {
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "21"
     }
 }
 
