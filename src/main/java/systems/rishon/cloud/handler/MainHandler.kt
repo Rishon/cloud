@@ -40,6 +40,7 @@ class MainHandler(private val plugin: Cloud) : IHandler {
             LoggerUtil.log("Server with name $name stopped.")
         }
 
+        this.serverManager.deleteContainersWithImages()
         this.serverManager.deleteDanglingContainers()
     }
 

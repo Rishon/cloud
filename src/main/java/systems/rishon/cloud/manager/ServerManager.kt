@@ -122,6 +122,19 @@ class ServerManager(private val handler: MainHandler) {
         }
     }
 
+    fun deleteContainersWithImages() {
+        val containers = this.dockerClient.listContainers()
+        LoggerUtil.log("Checking for containers with images...")
+
+        for (container in containers) {
+            if (this.images.contains(container.image)) {
+                LoggerUtil.error("Container with id ${container.id} and image ${container.image} will be removed.")
+                this.dockerClient.removeContainer(container.id, true)
+            }
+        }
+        LoggerUtil.log("Containers with images removed.")
+    }
+
     fun deleteDanglingContainers(): CompletableFuture<Void> {
         val future = CompletableFuture<Void>()
 
@@ -144,18 +157,25 @@ class ServerManager(private val handler: MainHandler) {
      */
     fun monitorAndScale() {
         val proxy = this.handler.getPlugin().proxy
-        val playerCount = proxy.playerCount
-        val serverCount = this.containerMap.size
 
         this.serverData.forEach { data ->
+            val serverName = data.serverName
+            val maxPlayers = data.maxPlayers
+            val proxyServers = proxy.allServers
+
+            val playerCount = proxyServers.stream().filter { it.serverInfo.name.startsWith(serverName) }
+                .mapToInt { it.playersConnected.size }.sum()
+
+            val serverCount = this.containerMap.entries.count { it.key.startsWith(serverName) }
+
             if (serverCount < data.maxConcurrentServers) {
-                if (playerCount > serverCount * data.maxPlayers) {
-                    startServer(data.dockerImage, data.serverName)
+                if (playerCount > serverCount * maxPlayers) {
+                    startServer(data.dockerImage, serverName)
                 }
             } else if (serverCount > data.minConcurrentServers) {
                 val serversToStop = this.containerMap.filter { (name, _) ->
                     proxy.getServer(name).map { server ->
-                        server.playersConnected.size < data.maxPlayers / 2
+                        server.playersConnected.size < maxPlayers / 2
                     }.orElse(false)
                 }
 
