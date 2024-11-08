@@ -22,11 +22,11 @@ repositories {
 
 dependencies {
     compileOnly("com.velocitypowered:velocity-api:3.3.0-SNAPSHOT")
-    compileOnly("org.projectlombok:lombok:1.18.32")
+    compileOnly("org.projectlombok:lombok:1.18.34")
 
     // Docker
-    implementation("com.github.docker-java:docker-java-core:3.3.6")
-    implementation("com.github.docker-java:docker-java-transport-httpclient5:3.3.6")
+    implementation("com.github.docker-java:docker-java-core:3.4.0")
+    implementation("com.github.docker-java:docker-java-transport-httpclient5:3.4.0")
 
     // Utils-API
     implementation("systems.rishon:utils-api:1.0.0")

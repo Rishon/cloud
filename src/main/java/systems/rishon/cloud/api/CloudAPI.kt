@@ -29,6 +29,16 @@ class CloudAPI {
     }
 
     /**
+     * Will stop the server and use the latest image to start it again
+     * @param serverName String
+     * @throws Exception
+     */
+    fun redeployServer(serverName: String) {
+        val serverManager = ServerManager.getManager()
+        serverManager.serverData
+    }
+
+    /**
      * Check if a server is related to the cloud system
      * @param serverName String
      * @return Boolean
